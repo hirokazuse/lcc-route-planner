@@ -266,7 +266,8 @@ function buildSkyscannerUrl(fromIata, toIata, date) {
 }
 
 function buildKiwiUrl(fromIata, toIata, date) {
-  return `https://www.kiwi.com/en/search/results/${fromIata}/${toIata}/${date}`;
+  const [y, m, d] = date.split('-');
+  return `https://www.kiwi.com/en/search/results/${fromIata}/${toIata}?adults=1&dateFrom=${d}%2F${m}%2F${y}&dateTo=${d}%2F${m}%2F${y}`;
 }
 
 async function searchRoutes() {
