@@ -185,7 +185,6 @@
       .leg-links { flex-direction: column; gap: 4px; }
     }
   </style>
-<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <div class="container">
@@ -255,8 +254,8 @@ function buildSkyscannerUrl(fromIata, toIata, date) {
   return `https://www.skyscanner.jp/transport/flights/${fromIata}/${toIata}/${formatDateShort(date)}/`;
 }
 
-function buildGoogleFlightsUrl(fromIata, toIata, date) {
-  return `https://www.google.com/travel/flights?q=Flights+from+${fromIata}+to+${toIata}+on+${date}`;
+function buildKiwiUrl(fromIata, toIata, date) {
+  return `https://www.kiwi.com/en/search/results/${fromIata}/${toIata}/${date}`;
 }
 
 async function searchRoutes() {
@@ -370,8 +369,10 @@ function renderRoutes(routes, depdate) {
     ).join('');
 
     const legsHtml = (r.legs||[]).map(leg => {
-      const ss = buildSkyscannerUrl(leg.from_iata||leg.from.slice(0,3).toUpperCase(), leg.to_iata||leg.to.slice(0,3).toUpperCase(), depdate);
-      const gf = buildGoogleFlightsUrl(leg.from_iata||leg.from.slice(0,3).toUpperCase(), leg.to_iata||leg.to.slice(0,3).toUpperCase(), depdate);
+      const fromCode = leg.from_iata||leg.from.slice(0,3).toUpperCase();
+      const toCode = leg.to_iata||leg.to.slice(0,3).toUpperCase();
+      const ss = buildSkyscannerUrl(fromCode, toCode, depdate);
+      const kw = buildKiwiUrl(fromCode, toCode, depdate);
       return `
         <div class="leg-item">
           <div>
@@ -380,7 +381,7 @@ function renderRoutes(routes, depdate) {
           </div>
           <div class="leg-links">
             <a href="${ss}" target="_blank" rel="noopener"><button class="btn btn-sm">Skyscanner</button></a>
-            <a href="${gf}" target="_blank" rel="noopener"><button class="btn btn-sm">Google</button></a>
+            <a href="${kw}" target="_blank" rel="noopener"><button class="btn btn-sm">Kiwi</button></a>
           </div>
         </div>`;
     }).join('');
