@@ -121,7 +121,8 @@
       </div>
       <div class="form-group">
         <label id="lDest">最終目的地</label>
-        <input type="text" id="dest" />
+        <input type="text" id="dest" oninput="onDestInput()" />
+        <span id="destHint" style="font-size:11px;color:var(--text-secondary);display:none;" id="destHint"></span>
       </div>
       <div class="form-group">
         <label id="lDate">出発日</label>
@@ -182,6 +183,9 @@ const I18N = {
     oLayHalf: '半日（6〜12時間・市内観光可）', oLayOver: '1泊（24時間〜・ゆっくり観光）',
     layoverMap: { any:'乗り継ぎ時間は指定なし', short:'乗り継ぎは短め（2〜4時間、空港内のみ）', half:'半日程度の乗り継ぎ（6〜12時間、市内日帰り観光可能）', overnight:'1泊の乗り継ぎ（24時間以上、ゆっくり観光）' },
     layoverLabel: '乗り継ぎ滞在', layoverWarn: '⚠️ 異なるLCC間の乗り継ぎは遅延補償なし。余裕を持たせています。',
+    destPh2: '空欄でおまかせ提案',
+    omakaseMode: '🎲 おまかせモード：予算で行ける意外なルートを提案します',
+    omakasePrompt: '目的地は指定なし。出発地と予算から、LCCで行ける意外で魅力的な目的地を自由に提案してください。乗り継ぎ地での観光も含め、旅のインスピレーションを刺激する提案をお願いします。',
     promptLang: '日本語'
   },
   en: {
@@ -204,6 +208,9 @@ const I18N = {
     oLayHalf: 'Half day (6-12h, city sightseeing)', oLayOver: 'Overnight (24h+, leisurely)',
     layoverMap: { any:'no preference on layover time', short:'short layover (2-4 hours, airport only)', half:'half-day layover (6-12 hours, city day trip possible)', overnight:'overnight layover (24+ hours, leisurely sightseeing)' },
     layoverLabel: 'Layover', layoverWarn: '⚠️ No delay protection between different LCCs. Buffer time included.',
+    destPh2: 'Leave blank for surprise suggestions',
+    omakaseMode: '🎲 Surprise Mode: AI suggests unexpected routes within your budget',
+    omakasePrompt: 'No destination specified. Freely suggest surprising and attractive destinations reachable by LCC from the origin within the budget. Include transit sightseeing to inspire the traveler.',
     promptLang: 'English'
   },
   th: {
@@ -226,6 +233,9 @@ const I18N = {
     oLayHalf: 'ครึ่งวัน (6-12 ชม., ท่องเที่ยวในเมือง)', oLayOver: 'ค้างคืน (24 ชม.+)',
     layoverMap: { any:'ไม่ระบุเวลาแวะพัก', short:'แวะพักสั้น (2-4 ชม., ในสนามบิน)', half:'แวะพักครึ่งวัน (6-12 ชม., ท่องเที่ยวในเมืองได้)', overnight:'ค้างคืน (24 ชม.+, ท่องเที่ยวได้อย่างเต็มที่)' },
     layoverLabel: 'เวลาแวะพัก', layoverWarn: '⚠️ ไม่มีการคุ้มครองความล่าช้าระหว่าง LCC ต่างสายการบิน',
+    destPh2: 'เว้นว่างเพื่อรับการแนะนำแบบสุ่ม',
+    omakaseMode: '🎲 โหมดสุ่ม: AI แนะนำเส้นทางที่คาดไม่ถึงภายในงบประมาณ',
+    omakasePrompt: 'ไม่ระบุปลายทาง กรุณาแนะนำปลายทางที่น่าสนใจและคาดไม่ถึงซึ่งเดินทางได้ด้วย LCC จากต้นทางภายในงบประมาณ รวมถึงการท่องเที่ยวระหว่างแวะพักด้วย',
     promptLang: 'ภาษาไทย'
   }
 };
@@ -254,12 +264,25 @@ function setLang(lang) {
   document.getElementById('oCheapest').textContent = t.oCheapest;
   document.getElementById('oFastest').textContent = t.oFastest;
   document.getElementById('searchBtn').textContent = t.searchBtn;
+  document.getElementById('dest').placeholder = document.getElementById('dest').value ? t.destPh : t.destPh2;
   document.getElementById('lLayover').textContent = t.layover;
   document.getElementById('oLayAny').textContent = t.oLayAny;
   document.getElementById('oLayShort').textContent = t.oLayShort;
   document.getElementById('oLayHalf').textContent = t.oLayHalf;
   document.getElementById('oLayOver').textContent = t.oLayOver;
   document.title = t.title;
+}
+
+function onDestInput() {
+  const t = I18N[currentLang];
+  const val = document.getElementById('dest').value.trim();
+  const hint = document.getElementById('destHint');
+  if (!val) {
+    hint.textContent = t.omakaseMode;
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
 }
 
 function swapCities() {
@@ -273,6 +296,13 @@ document.getElementById('depdate').value =
   `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
 setLang('ja');
+document.getElementById('dest').placeholder = I18N['ja'].destPh2;
+document.getElementById('dest').addEventListener('focus', function() {
+  if (!this.value) this.placeholder = '';
+});
+document.getElementById('dest').addEventListener('blur', function() {
+  if (!this.value) this.placeholder = I18N[currentLang].destPh2;
+});
 
 function formatDateShort(d) { return d.replace(/-/g,''); }
 function buildSkyscannerUrl(f, t, d) { return `https://www.skyscanner.jp/transport/flights/${f}/${t}/${formatDateShort(d)}/`; }
@@ -291,7 +321,7 @@ async function searchRoutes() {
   const style = document.getElementById('style').value;
   const layover = document.getElementById('layover').value;
 
-  if (!origin || !dest || !depdate) {
+  if (!origin || !depdate) {
     document.getElementById('results').innerHTML = `<div class="error">${t.error}</div>`;
     return;
   }
@@ -301,11 +331,13 @@ async function searchRoutes() {
   btn.textContent = t.searching;
   document.getElementById('results').innerHTML = `<div class="loading">${t.loading}</div>`;
 
+  const isOmakase = !dest;
+  const destLine = isOmakase ? t.omakasePrompt : `- Destination: ${dest}`;
   const prompt = `You are an expert in combining LCC (Low-Cost Carrier) flights for travel routes. Respond in ${t.promptLang}.
 
 Suggest 3-4 LCC connecting route options for these conditions:
 - Origin: ${origin}
-- Destination: ${dest}
+- ${destLine}
 - Date: ${depdate}
 - Budget: ${budget ? budget + ' JPY' : 'flexible'}
 - Preferred transit: ${transit || 'none (suggest freely)'}
