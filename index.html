@@ -34,14 +34,7 @@
     .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
     h1 { font-size: 22px; font-weight: 500; }
     h1 span { color: var(--text-secondary); font-weight: 400; font-size: 16px; margin-left: 8px; }
-    .lang-switcher { display: flex; gap: 4px; }
-    .lang-btn {
-      height: 30px; padding: 0 10px; border-radius: var(--radius-md);
-      border: 0.5px solid var(--border-md); background: transparent;
-      color: var(--text-secondary); font-size: 12px; cursor: pointer;
-      font-family: var(--font); transition: all 0.15s;
-    }
-    .lang-btn.active { background: var(--text); color: var(--bg); border-color: transparent; }
+
     .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .form-group { display: flex; flex-direction: column; gap: 6px; }
@@ -103,11 +96,11 @@
 <div class="container">
   <div class="header">
     <h1 id="appTitle">LCC ルートプランナー <span id="appSubtitle">寄り道も最適化</span></h1>
-    <div class="lang-switcher">
-      <button class="lang-btn active" onclick="setLang('ja')">日本語</button>
-      <button class="lang-btn" onclick="setLang('en')">English</button>
-      <button class="lang-btn" onclick="setLang('th')">ไทย</button>
-    </div>
+    <select id="langSelect" onchange="setLang(this.value)" style="height:30px;padding:0 8px;border-radius:8px;border:0.5px solid var(--border-md);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font);cursor:pointer;">
+      <option value="ja">🇯🇵 日本語</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="th">🇹🇭 ภาษาไทย</option>
+    </select>
   </div>
 
   <div class="card">
@@ -244,9 +237,7 @@ let currentLang = 'ja';
 
 function setLang(lang) {
   currentLang = lang;
-  document.querySelectorAll('.lang-btn').forEach((b,i) => {
-    b.classList.toggle('active', ['ja','en','th'][i] === lang);
-  });
+  document.getElementById('langSelect').value = lang;
   const t = I18N[lang];
   document.getElementById('appTitle').innerHTML = `${t.title} <span id="appSubtitle">${t.subtitle}</span>`;
   document.getElementById('lOrigin').textContent = t.origin;
