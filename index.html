@@ -175,7 +175,7 @@ const I18N = {
     oLayAny: '指定なし', oLayShort: '短め（2時間〜・空港内）',
     oLayHalf: '半日（6〜12時間・市内観光可）', oLayOver: '1泊（24時間〜・ゆっくり観光）',
     layoverMap: { any:'乗り継ぎ時間は指定なし', short:'乗り継ぎは短め（2〜4時間、空港内のみ）', half:'半日程度の乗り継ぎ（6〜12時間、市内日帰り観光可能）', overnight:'1泊の乗り継ぎ（24時間以上、ゆっくり観光）' },
-    layoverLabel: '乗り継ぎ滞在', layoverWarn: '⚠️ 異なるLCC間の乗り継ぎは遅延補償なし。余裕を持たせています。',
+    bestSeason: '💡 ベストシーズン', layoverLabel: '乗り継ぎ滞在', layoverWarn: '⚠️ 異なるLCC間の乗り継ぎは遅延補償なし。余裕を持たせています。',
     destPh2: '空欄でおまかせ提案',
     omakaseMode: '🎲 おまかせモード：予算で行ける意外なルートを提案します',
     omakasePrompt: '目的地は指定なし。出発地と予算から、LCCで行ける意外で魅力的な目的地を自由に提案してください。乗り継ぎ地での観光も含め、旅のインスピレーションを刺激する提案をお願いします。',
@@ -200,7 +200,7 @@ const I18N = {
     oLayAny: 'Any', oLayShort: 'Short (2h+, airport only)',
     oLayHalf: 'Half day (6-12h, city sightseeing)', oLayOver: 'Overnight (24h+, leisurely)',
     layoverMap: { any:'no preference on layover time', short:'short layover (2-4 hours, airport only)', half:'half-day layover (6-12 hours, city day trip possible)', overnight:'overnight layover (24+ hours, leisurely sightseeing)' },
-    layoverLabel: 'Layover', layoverWarn: '⚠️ No delay protection between different LCCs. Buffer time included.',
+    bestSeason: '💡 Best Season', layoverLabel: 'Layover', layoverWarn: '⚠️ No delay protection between different LCCs. Buffer time included.',
     destPh2: 'Leave blank for surprise suggestions',
     omakaseMode: '🎲 Surprise Mode: AI suggests unexpected routes within your budget',
     omakasePrompt: 'No destination specified. Freely suggest surprising and attractive destinations reachable by LCC from the origin within the budget. Include transit sightseeing to inspire the traveler.',
@@ -225,7 +225,7 @@ const I18N = {
     oLayAny: 'ไม่ระบุ', oLayShort: 'สั้น (2 ชม.+, ในสนามบิน)',
     oLayHalf: 'ครึ่งวัน (6-12 ชม., ท่องเที่ยวในเมือง)', oLayOver: 'ค้างคืน (24 ชม.+)',
     layoverMap: { any:'ไม่ระบุเวลาแวะพัก', short:'แวะพักสั้น (2-4 ชม., ในสนามบิน)', half:'แวะพักครึ่งวัน (6-12 ชม., ท่องเที่ยวในเมืองได้)', overnight:'ค้างคืน (24 ชม.+, ท่องเที่ยวได้อย่างเต็มที่)' },
-    layoverLabel: 'เวลาแวะพัก', layoverWarn: '⚠️ ไม่มีการคุ้มครองความล่าช้าระหว่าง LCC ต่างสายการบิน',
+    bestSeason: '💡 ช่วงเวลาที่ดีที่สุด', layoverLabel: 'เวลาแวะพัก', layoverWarn: '⚠️ ไม่มีการคุ้มครองความล่าช้าระหว่าง LCC ต่างสายการบิน',
     destPh2: 'เว้นว่างเพื่อรับการแนะนำแบบสุ่ม',
     omakaseMode: '🎲 โหมดสุ่ม: AI แนะนำเส้นทางที่คาดไม่ถึงภายในงบประมาณ',
     omakasePrompt: 'ไม่ระบุปลายทาง กรุณาแนะนำปลายทางที่น่าสนใจและคาดไม่ถึงซึ่งเดินทางได้ด้วย LCC จากต้นทางภายในงบประมาณ รวมถึงการท่องเที่ยวระหว่างแวะพักด้วย',
@@ -355,6 +355,7 @@ Reply ONLY in this JSON format (no other text):
 }
 
 Rules: Use real LCC routes. est_price in JPY (one-way). Only one featured:true.
+If destination is specified, add "best_season" field at root level (e.g. "best_season": "1〜3月（乾季・閑散期）") in the response language. Omit if no destination.
 layover_hours: hours at transit city (0 if last leg). different_airline_next: true if next leg is a different airline (interline risk).`;
 
   try {
@@ -370,7 +371,7 @@ layover_hours: hours at transit city (0 if last leg). different_airline_next: tr
     const text = data.content.map(i => i.text || '').join('');
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
-    renderRoutes(parsed.routes, depdate);
+    renderRoutes(parsed.routes, depdate, parsed);
   } catch(e) {
     document.getElementById('results').innerHTML = `<div class="error">${t.errorGen}: ${e.message}</div>`;
   }
@@ -379,12 +380,16 @@ layover_hours: hours at transit city (0 if last leg). different_airline_next: tr
   btn.textContent = t.searchBtn;
 }
 
-function renderRoutes(routes, depdate) {
+function renderRoutes(routes, depdate, parsed) {
   const t = I18N[currentLang];
   const el = document.getElementById('results');
   if (!routes || !routes.length) { el.innerHTML = `<div class="error">${t.notFound}</div>`; return; }
 
-  let html = `<p class="section-label">${routes.length}${t.routes}</p><div class="results">`;
+  let html = `<p class="section-label">${routes.length}${t.routes}</p>`;
+  if (parsed && parsed.best_season) {
+    html += `<div style="font-size:13px;color:var(--text-info);background:var(--bg-info);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px;">${t.bestSeason}: ${parsed.best_season}</div>`;
+  }
+  html += `<div class="results">`;
 
   routes.forEach(r => {
     const cities = [];
