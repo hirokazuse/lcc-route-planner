@@ -172,6 +172,32 @@
       0% { transform: scale(0.85); opacity: 0.8; }
       100% { transform: scale(2); opacity: 0; }
     }
+    .marker-price-badge {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #a32d2d;
+      color: #ffffff;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .marker-price-badge::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 4px;
+      border-style: solid;
+      border-color: #a32d2d transparent transparent transparent;
+    }
     @media (max-width: 480px) {
       #routeMap { height: 280px; }
       .form-grid { grid-template-columns: 1fr; }
@@ -612,6 +638,11 @@ function renderRouteOnMap(route, idx) {
         const pulse = document.createElement('div');
         pulse.className = 'marker-pulse';
         el2.appendChild(pulse);
+
+        const badge = document.createElement('div');
+        badge.className = 'marker-price-badge';
+        badge.textContent = `¥${(route.total_est||0).toLocaleString()}`;
+        el2.appendChild(badge);
 
         const popupHtml = `<div class="map-popup-card">
           <b>${leg.to}</b>
