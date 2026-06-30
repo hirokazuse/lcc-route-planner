@@ -339,6 +339,8 @@ const AIRPORT_COORDS = {
 
 let routeMap = null;
 let routeMapMarkers = [];
+let routeMapReady = false;
+let routeMapQueue = [];
 
 function getCoord(iata, name) {
   if (AIRPORT_COORDS[iata]) return AIRPORT_COORDS[iata];
@@ -372,10 +374,16 @@ function initRouteMap() {
     attributionControl: false
   });
   routeMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+  routeMap.on('load', () => {
+    routeMapReady = true;
+    const queue = routeMapQueue.slice();
+    routeMapQueue = [];
+    queue.forEach(fn => fn());
+  });
 }
 
 function clearRouteMapLayers() {
-  if (!routeMap) return;
+  if (!routeMap || !routeMapReady) return;
   ['route-line-0','route-line-1','route-line-2','route-line-3'].forEach(id => {
     if (routeMap.getLayer(id)) routeMap.removeLayer(id);
     if (routeMap.getSource(id)) routeMap.removeSource(id);
@@ -407,6 +415,10 @@ function renderRouteOnMap(route, idx) {
   if (typeof maplibregl === 'undefined') return;
   if (!route.legs || !route.legs.length) return;
   initRouteMap();
+  if (!routeMapReady) {
+    routeMapQueue.push(() => renderRouteOnMap(route, idx));
+    return;
+  }
   if (idx === 0) clearRouteMapLayers();
 
   const t = I18N[currentLang];
