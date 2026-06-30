@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LCC Route Planner</title>
   <script defer src="/_vercel/insights/script.js"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/3.6.2/maplibre-gl.css" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/3.6.2/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -347,6 +347,10 @@ function getCoord(iata, name) {
 }
 
 function initRouteMap() {
+  if (typeof maplibregl === 'undefined') {
+    console.warn('maplibregl not loaded yet, skipping map');
+    return;
+  }
   if (routeMap) return;
   const mapEl = document.getElementById('routeMap');
   mapEl.style.display = 'block';
@@ -390,6 +394,7 @@ function arcCoords(p1, p2, segments=40, bend=0.15) {
 const ROUTE_COLORS = ['#185fa5', '#3b6d11', '#854f0b', '#a32d2d'];
 
 function renderRouteOnMap(route, idx) {
+  if (typeof maplibregl === 'undefined') return;
   if (!route.legs || !route.legs.length) return;
   initRouteMap();
   if (idx === 0) clearRouteMapLayers();
