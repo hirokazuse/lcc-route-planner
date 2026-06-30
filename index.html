@@ -346,6 +346,16 @@ function getCoord(iata, name) {
   return AIRPORT_COORDS[guess] || null;
 }
 
+function waitForMaplibre(callback, retries=20) {
+  if (typeof maplibregl !== 'undefined') {
+    callback();
+  } else if (retries > 0) {
+    setTimeout(() => waitForMaplibre(callback, retries-1), 150);
+  } else {
+    console.warn('maplibre-gl failed to load');
+  }
+}
+
 function initRouteMap() {
   if (typeof maplibregl === 'undefined') {
     console.warn('maplibregl not loaded yet, skipping map');
@@ -647,7 +657,7 @@ function renderRoutes(routes, depdate, parsed) {
 
   // 地図に全ルートを描画（最初のルートを強調）
   if (routes.length && routes.some(r => r.legs && r.legs.length)) {
-    routes.forEach((r, i) => renderRouteOnMap(r, i));
+    waitForMaplibre(() => routes.forEach((r, i) => renderRouteOnMap(r, i)));
   }
 }
 </script>
