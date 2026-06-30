@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LCC Route Planner</title>
   <script defer src="/_vercel/insights/script.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/3.6.2/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/3.6.2/maplibre-gl.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -85,7 +87,23 @@
     .loading { text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 14px; }
     .error { background: var(--bg-danger); color: var(--text-danger); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; }
     .section-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+    #routeMap {
+      width: 100%; height: 280px; border-radius: var(--radius-lg);
+      border: 0.5px solid var(--border); margin-bottom: 1rem; display: none;
+      overflow: hidden;
+    }
+    .map-popup-card {
+      font-family: var(--font); font-size: 12px; line-height: 1.5;
+    }
+    .map-popup-card b { font-size: 13px; }
+    .maplibregl-popup-content {
+      background: var(--bg) !important; color: var(--text) !important;
+      border-radius: 8px !important; box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
+    }
+    .route-card { cursor: pointer; transition: border-color 0.15s; }
+    .route-card.map-active { border-color: var(--text-info); }
     @media (max-width: 480px) {
+      #routeMap { height: 220px; }
       .form-grid { grid-template-columns: 1fr; }
       .form-group.full { grid-column: 1; }
       .leg-links { flex-direction: column; gap: 4px; }
@@ -151,6 +169,7 @@
     <button class="btn btn-primary" id="searchBtn" onclick="searchRoutes()">ルートを探す →</button>
   </div>
 
+  <div id="routeMap"></div>
   <div id="results"></div>
 </div>
 
@@ -302,6 +321,160 @@ function buildKiwiUrl(f, t, d) {
   return `https://www.kiwi.com/en/search/results/${f}/${t}?adults=1&dateFrom=${dd}%2F${m}%2F${y}&dateTo=${dd}%2F${m}%2F${y}`;
 }
 
+// 主要LCCハブ・空港の静的座標テーブル（外部API不要・ゼロレイテンシ）
+const AIRPORT_COORDS = {
+  NRT:[140.3929,35.7720], HND:[139.7798,35.5494], KIX:[135.2440,34.4347],
+  NGO:[136.8242,34.8584], FUK:[130.4517,33.5859], CTS:[141.6925,42.7752],
+  BKK:[100.7501,13.6900], DMK:[100.6069,13.9126],
+  KUL:[101.7099,2.7456], SIN:[103.9915,1.3644],
+  DPS:[115.1667,-8.7482], CGK:[106.6558,-6.1256],
+  SGN:[106.6520,10.8188], HAN:[105.8019,21.2212],
+  MNL:[121.0198,14.5086], CEB:[123.9787,10.3075],
+  ICN:[126.4407,37.4602], PUS:[128.9382,35.1796],
+  TPE:[121.2342,25.0797], HKG:[113.9145,22.3080],
+  CDG:[2.5479,49.0097], LHR:[-0.4543,51.4700], BCN:[2.0833,41.2971],
+  DXB:[55.3644,25.2532], AUH:[54.6511,24.4330],
+  SYD:[151.1772,-33.9461], MEL:[144.8410,-37.6690],
+};
+
+let routeMap = null;
+let routeMapMarkers = [];
+
+function getCoord(iata, name) {
+  if (AIRPORT_COORDS[iata]) return AIRPORT_COORDS[iata];
+  const guess = (name||'').slice(0,3).toUpperCase();
+  return AIRPORT_COORDS[guess] || null;
+}
+
+function initRouteMap() {
+  if (routeMap) return;
+  const mapEl = document.getElementById('routeMap');
+  mapEl.style.display = 'block';
+  routeMap = new maplibregl.Map({
+    container: 'routeMap',
+    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    center: [110, 15],
+    zoom: 2.2,
+    attributionControl: false
+  });
+  routeMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+}
+
+function clearRouteMapLayers() {
+  if (!routeMap) return;
+  ['route-line-0','route-line-1','route-line-2','route-line-3'].forEach(id => {
+    if (routeMap.getLayer(id)) routeMap.removeLayer(id);
+    if (routeMap.getSource(id)) routeMap.removeSource(id);
+  });
+  routeMapMarkers.forEach(m => m.remove());
+  routeMapMarkers = [];
+}
+
+// 2点間に弧（カーブ）を描くGeoJSON座標列を生成
+function arcCoords(p1, p2, segments=40, bend=0.15) {
+  const coords = [];
+  const dx = p2[0]-p1[0], dy = p2[1]-p1[1];
+  const mx = (p1[0]+p2[0])/2, my = (p1[1]+p2[1])/2;
+  const dist = Math.sqrt(dx*dx+dy*dy);
+  const nx = -dy/(dist||1), ny = dx/(dist||1);
+  const ctrlX = mx + nx*dist*bend, ctrlY = my + ny*dist*bend;
+  for (let i=0; i<=segments; i++) {
+    const t = i/segments;
+    const x = (1-t)*(1-t)*p1[0] + 2*(1-t)*t*ctrlX + t*t*p2[0];
+    const y = (1-t)*(1-t)*p1[1] + 2*(1-t)*t*ctrlY + t*t*p2[1];
+    coords.push([x,y]);
+  }
+  return coords;
+}
+
+const ROUTE_COLORS = ['#185fa5', '#3b6d11', '#854f0b', '#a32d2d'];
+
+function renderRouteOnMap(route, idx) {
+  if (!route.legs || !route.legs.length) return;
+  initRouteMap();
+  if (idx === 0) clearRouteMapLayers();
+
+  const t = I18N[currentLang];
+  const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
+  const bounds = new maplibregl.LngLatBounds();
+  let allCoords = [];
+
+  route.legs.forEach(leg => {
+    const fc = leg.from_iata || leg.from.slice(0,3).toUpperCase();
+    const tc = leg.to_iata || leg.to.slice(0,3).toUpperCase();
+    const p1 = getCoord(fc, leg.from);
+    const p2 = getCoord(tc, leg.to);
+    if (!p1 || !p2) return;
+    bounds.extend(p1); bounds.extend(p2);
+    const arc = arcCoords(p1, p2);
+    allCoords = allCoords.concat(arc);
+  });
+
+  if (!allCoords.length) return;
+
+  const srcId = `route-line-${idx}`;
+  routeMap.addSource(srcId, {
+    type: 'geojson',
+    data: { type:'Feature', geometry:{ type:'LineString', coordinates: allCoords } }
+  });
+  routeMap.addLayer({
+    id: srcId, type: 'line', source: srcId,
+    layout: { 'line-join':'round', 'line-cap':'round' },
+    paint: { 'line-color': color, 'line-width': idx===0?3.5:2, 'line-opacity': idx===0?0.95:0.5, 'line-dasharray': idx===0?[1]:[2,1] }
+  });
+
+  // 中継地マーカー（滞在時間でサイズ差別化）
+  route.legs.forEach((leg, i) => {
+    const isLast = i === route.legs.length - 1;
+    const fc = leg.from_iata || leg.from.slice(0,3).toUpperCase();
+    const p1 = getCoord(fc, leg.from);
+    if (!p1) return;
+    const isOrigin = i === 0;
+    const layoverH = leg.layover_hours || 0;
+    const size = isOrigin ? 9 : (layoverH >= 20 ? 16 : layoverH >= 6 ? 12 : 8);
+
+    if (idx === 0) {
+      const el = document.createElement('div');
+      el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${isOrigin?'#666660':color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);cursor:pointer;`;
+      const popupHtml = isOrigin
+        ? `<div class="map-popup-card"><b>${leg.from}</b><br>${t.origin.replace(' *','')}</div>`
+        : `<div class="map-popup-card"><b>${leg.from}</b><br>${layoverH>0 ? `✈ ${t.layoverLabel}: ${layoverH}h` : ''}${leg.different_airline_next ? ' ⚠️' : ''}</div>`;
+      const marker = new maplibregl.Marker({element: el})
+        .setLngLat(p1)
+        .setPopup(new maplibregl.Popup({offset:12}).setHTML(popupHtml))
+        .addTo(routeMap);
+      routeMapMarkers.push(marker);
+    }
+
+    if (isLast) {
+      const p2 = getCoord(leg.to_iata||leg.to.slice(0,3).toUpperCase(), leg.to);
+      if (p2 && idx === 0) {
+        const el2 = document.createElement('div');
+        el2.style.cssText = `width:14px;height:14px;border-radius:50%;background:#a32d2d;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);`;
+        const marker2 = new maplibregl.Marker({element: el2})
+          .setLngLat(p2)
+          .setPopup(new maplibregl.Popup({offset:12}).setHTML(`<div class="map-popup-card"><b>${leg.to}</b><br>${t.dest.replace(' *','')}</div>`))
+          .addTo(routeMap);
+        routeMapMarkers.push(marker2);
+      }
+    }
+  });
+
+  if (idx === 0 && !bounds.isEmpty()) {
+    routeMap.fitBounds(bounds, { padding: 40, maxZoom: 6, duration: 600 });
+  }
+}
+
+function highlightRouteOnMap(routeIdx, allRoutes) {
+  if (!routeMap) return;
+  clearRouteMapLayers();
+  const reordered = [allRoutes[routeIdx], ...allRoutes.filter((_,i)=>i!==routeIdx)];
+  reordered.forEach((r, i) => renderRouteOnMap(r, i));
+  document.querySelectorAll('.route-card').forEach((c,i) => {
+    c.classList.toggle('map-active', i === routeIdx);
+  });
+}
+
 async function searchRoutes() {
   const t = I18N[currentLang];
   const origin = document.getElementById('origin').value.trim();
@@ -321,6 +494,7 @@ async function searchRoutes() {
   btn.disabled = true;
   btn.textContent = t.searching;
   document.getElementById('results').innerHTML = `<div class="loading">${t.loading}</div>`;
+  clearRouteMapLayers();
 
   const isOmakase = !dest;
   const destLine = isOmakase ? t.omakasePrompt : `- Destination: ${dest}`;
@@ -418,7 +592,7 @@ function renderRoutes(routes, depdate, parsed) {
   }
   html += `<div class="results">`;
 
-  routes.forEach(r => {
+  routes.forEach((r, idx) => {
     const cities = [];
     if (r.legs && r.legs.length) { cities.push(r.legs[0].from); r.legs.forEach(l => cities.push(l.to)); }
     const pathHtml = cities.map((c,i) =>
@@ -446,7 +620,7 @@ function renderRoutes(routes, depdate, parsed) {
     }).join('');
 
     html += `
-      <div class="route-card${r.featured?' featured':''}">
+      <div class="route-card${r.featured?' featured':''}" data-route-idx="${idx}" onclick="highlightRouteOnMap(${idx}, window._routesData.routes)">
         <div class="route-header">
           <div class="route-title">${r.title}</div>
           <span class="badge badge-${r.badge_type||'info'}">${r.badge||''}</span>
@@ -465,6 +639,11 @@ function renderRoutes(routes, depdate, parsed) {
 
   html += '</div>';
   el.innerHTML = html;
+
+  // 地図に全ルートを描画（最初のルートを強調）
+  if (routes.length && routes.some(r => r.legs && r.legs.length)) {
+    routes.forEach((r, i) => renderRouteOnMap(r, i));
+  }
 }
 </script>
 </body>
