@@ -168,7 +168,10 @@
         </select>
       </div>
     </div>
-    <button class="btn btn-primary" id="searchBtn" onclick="searchRoutes()">ルートを探す →</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" id="searchBtn" onclick="searchRoutes(false)" style="flex:1;">ルートを探す →</button>
+      <button class="btn btn-primary" id="searchMapBtn" onclick="searchRoutes(true)" style="flex:1;background:var(--bg);color:var(--text);border-color:var(--border-md);">🗺️ 地図で探す</button>
+    </div>
   </div>
 
   <div id="routeMap"></div>
@@ -186,7 +189,7 @@ const I18N = {
     style: '旅行スタイル',
     oBalance: 'バランス重視（コスト＋時間）', oDetour: '寄り道・乗継を楽しむ',
     oCheapest: 'とにかく安く', oFastest: 'なるべく速く',
-    searchBtn: 'ルートを探す →', searching: '検索中...',
+    searchBtn: 'ルートを探す →', searchMapBtn: '🗺️ 地図で探す', searching: '検索中...',
     loading: 'LCCルートを生成中...', error: '出発地・目的地・日付を入力してください',
     errorGen: 'ルート生成に失敗しました', notFound: 'ルートが見つかりませんでした',
     routes: '件のルート候補', estTotal: '推定総額', totalTime: '総所要時間', detourScore: '寄り道度',
@@ -211,7 +214,7 @@ const I18N = {
     style: 'Travel Style',
     oBalance: 'Balanced (cost + time)', oDetour: 'Enjoy layovers & detours',
     oCheapest: 'Cheapest', oFastest: 'Fastest',
-    searchBtn: 'Find Routes →', searching: 'Searching...',
+    searchBtn: 'Find Routes →', searchMapBtn: '🗺️ Find on Map', searching: 'Searching...',
     loading: 'Generating LCC routes...', error: 'Please enter origin, destination and date',
     errorGen: 'Failed to generate routes', notFound: 'No routes found',
     routes: ' route(s) found', estTotal: 'Est. Total', totalTime: 'Total Time', detourScore: 'Detour Score',
@@ -236,7 +239,7 @@ const I18N = {
     style: 'สไตล์การเดินทาง',
     oBalance: 'สมดุล (ราคา + เวลา)', oDetour: 'สนุกกับการแวะเที่ยว',
     oCheapest: 'ราคาถูกที่สุด', oFastest: 'เร็วที่สุด',
-    searchBtn: 'ค้นหาเส้นทาง →', searching: 'กำลังค้นหา...',
+    searchBtn: 'ค้นหาเส้นทาง →', searchMapBtn: '🗺️ ค้นหาบนแผนที่', searching: 'กำลังค้นหา...',
     loading: 'กำลังสร้างเส้นทาง LCC...', error: 'กรุณากรอกต้นทาง ปลายทาง และวันที่',
     errorGen: 'ไม่สามารถสร้างเส้นทางได้', notFound: 'ไม่พบเส้นทาง',
     routes: ' เส้นทางที่พบ', estTotal: 'ราคารวมโดยประมาณ', totalTime: 'เวลารวม', detourScore: 'คะแนนการแวะเที่ยว',
@@ -276,6 +279,7 @@ function setLang(lang) {
   document.getElementById('oCheapest').textContent = t.oCheapest;
   document.getElementById('oFastest').textContent = t.oFastest;
   document.getElementById('searchBtn').textContent = t.searchBtn;
+  document.getElementById('searchMapBtn').textContent = t.searchMapBtn;
   document.getElementById('dest').placeholder = document.getElementById('dest').value ? t.destPh : t.destPh2;
   document.getElementById('lLayover').textContent = t.layover;
   document.getElementById('oLayAny').textContent = t.oLayAny;
@@ -504,7 +508,7 @@ function highlightRouteOnMap(routeIdx, allRoutes) {
   });
 }
 
-async function searchRoutes() {
+async function searchRoutes(showMap) {
   const t = I18N[currentLang];
   const origin = document.getElementById('origin').value.trim();
   const dest = document.getElementById('dest').value.trim();
@@ -520,10 +524,17 @@ async function searchRoutes() {
   }
 
   const btn = document.getElementById('searchBtn');
-  btn.disabled = true;
-  btn.textContent = t.searching;
+  const mapBtn = document.getElementById('searchMapBtn');
+  btn.disabled = true; mapBtn.disabled = true;
+  const activeBtn = showMap ? mapBtn : btn;
+  const activeLabel = activeBtn.textContent;
+  activeBtn.textContent = t.searching;
   document.getElementById('results').innerHTML = `<div class="loading">${t.loading}</div>`;
-  clearRouteMapLayers();
+  if (showMap) {
+    clearRouteMapLayers();
+  } else {
+    document.getElementById('routeMap').style.display = 'none';
+  }
 
   const isOmakase = !dest;
   const destLine = isOmakase ? t.omakasePrompt : `- Destination: ${dest}`;
@@ -574,14 +585,15 @@ layover_hours: hours at transit city (0 if last leg). different_airline_next: tr
     const text = data.content.map(i => i.text || '').join('');
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
-    window._routesData = { routes: parsed.routes, depdate, parsed };
-    renderRoutes(parsed.routes, depdate, parsed);
+    window._routesData = { routes: parsed.routes, depdate, parsed, showMap };
+    renderRoutes(parsed.routes, depdate, parsed, showMap);
   } catch(e) {
     document.getElementById('results').innerHTML = `<div class="error">${t.errorGen}: ${e.message}</div>`;
   }
 
-  btn.disabled = false;
+  btn.disabled = false; mapBtn.disabled = false;
   btn.textContent = t.searchBtn;
+  mapBtn.textContent = t.searchMapBtn;
 }
 
 function sortRoutes() {
@@ -596,10 +608,10 @@ function sortRoutes() {
   });
   else if (sort === 'detour') sorted.sort((a,b) => (b.detour_score||'').length - (a.detour_score||'').length);
   else sorted = [...routes];
-  renderRoutes(sorted, depdate, parsed);
+  renderRoutes(sorted, depdate, parsed, window._routesData.showMap);
 }
 
-function renderRoutes(routes, depdate, parsed) {
+function renderRoutes(routes, depdate, parsed, showMap) {
   const t = I18N[currentLang];
   const el = document.getElementById('results');
   if (!routes || !routes.length) { el.innerHTML = `<div class="error">${t.notFound}</div>`; return; }
@@ -671,7 +683,9 @@ function renderRoutes(routes, depdate, parsed) {
 
   // 地図に全ルートを描画（最初のルートを強調）
   if (routes.length && routes.some(r => r.legs && r.legs.length)) {
-    waitForMaplibre(() => routes.forEach((r, i) => renderRouteOnMap(r, i)));
+    if (showMap && routes.length && routes.some(r => r.legs && r.legs.length)) {
+      waitForMaplibre(() => routes.forEach((r, i) => renderRouteOnMap(r, i)));
+    }
   }
 }
 </script>
