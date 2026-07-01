@@ -142,6 +142,27 @@
       0% { transform: scale(0.85); opacity: 0.8; }
       100% { transform: scale(2); opacity: 0; }
     }
+    .marker-price-label {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%; transform: translateX(-50%);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 11px; font-weight: 600;
+      padding: 3px 7px;
+      border-radius: 6px;
+      white-space: nowrap;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.18);
+      border: 0.5px solid var(--border);
+      pointer-events: none;
+    }
+    .marker-price-label::after {
+      content: '';
+      position: absolute;
+      top: 100%; left: 50%; transform: translateX(-50%);
+      border: 4px solid transparent;
+      border-top-color: var(--bg);
+    }
     .route-card { cursor: pointer; transition: border-color 0.15s; }
     .route-number-badge {
       display: inline-flex; align-items: center; justify-content: center;
@@ -568,9 +589,16 @@ function renderRouteOnMap(route, idx) {
         el2.style.height = '16px';
         el2.style.background = '#a32d2d';
         el2.style.color = '#a32d2d';
+        el2.style.position = 'relative';
         const pulse2 = document.createElement('div');
         pulse2.className = 'marker-pulse';
         el2.appendChild(pulse2);
+        if (route.total_est) {
+          const priceLabel = document.createElement('div');
+          priceLabel.className = 'marker-price-label';
+          priceLabel.textContent = '¥' + route.total_est.toLocaleString();
+          el2.appendChild(priceLabel);
+        }
         const marker2 = new maplibregl.Marker({element: el2})
           .setLngLat(p2)
           .setPopup(new maplibregl.Popup({offset:12}).setHTML(`<div class="map-popup-card"><b>${leg.to}</b><span style="font-size:11px;color:var(--text-secondary);">${t.dest.replace(' *','')}</span><div class="popup-price" style="font-size:14px;margin-top:6px;">${t.estTotal}: ¥${(route.total_est||0).toLocaleString()}</div></div>`))
