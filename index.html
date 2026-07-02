@@ -253,7 +253,7 @@ const I18N = {
     title: 'LCC ルートプランナー', subtitle: '寄り道も最適化',
     origin: '出発地 *', originPh: '例: 東京 / NRT',
     dest: '最終目的地', destPh: '例: バリ島 / DPS',
-    date: '出発日 *', budget: '予算の目安（円） *', budgetPh: '例: 80000',
+    date: '出発日 *', budget: '予算の目安 *', budgetPh: '例: 80000',
     transit: '希望するトランジット都市（任意）', transitPh: '例: バンコク、クアラルンプール',
     style: '旅行スタイル',
     oBalance: 'バランス重視（コスト＋時間）', oDetour: '寄り道・乗継を楽しむ',
@@ -278,7 +278,7 @@ const I18N = {
     title: 'LCC Route Planner', subtitle: 'Optimize Your Layovers',
     origin: 'Origin *', originPh: 'e.g. Tokyo / NRT',
     dest: 'Destination', destPh: 'e.g. Bali / DPS',
-    date: 'Departure Date *', budget: 'Budget (JPY) *', budgetPh: 'e.g. 80000',
+    date: 'Departure Date *', budget: 'Budget *', budgetPh: 'e.g. 80000',
     transit: 'Preferred transit city (optional)', transitPh: 'e.g. Bangkok, Kuala Lumpur',
     style: 'Travel Style',
     oBalance: 'Balanced (cost + time)', oDetour: 'Enjoy layovers & detours',
@@ -303,7 +303,7 @@ const I18N = {
     title: 'แพลนเนอร์เส้นทาง LCC', subtitle: 'เพิ่มความสนุกในการแวะพัก',
     origin: 'ต้นทาง *', originPh: 'เช่น โตเกียว / NRT',
     dest: 'ปลายทาง', destPh: 'เช่น บาหลี / DPS',
-    date: 'วันที่เดินทาง *', budget: 'งบประมาณ (เยน) *', budgetPh: 'เช่น 80000',
+    date: 'วันที่เดินทาง *', budget: 'งบประมาณ *', budgetPh: 'เช่น 80000',
     transit: 'เมืองแวะพักที่ต้องการ (ไม่บังคับ)', transitPh: 'เช่น กรุงเทพฯ, กัวลาลัมเปอร์',
     style: 'สไตล์การเดินทาง',
     oBalance: 'สมดุล (ราคา + เวลา)', oDetour: 'สนุกกับการแวะเที่ยว',
@@ -338,7 +338,7 @@ function setLang(lang) {
   document.getElementById('lDest').textContent = t.dest;
   document.getElementById('dest').placeholder = t.destPh;
   document.getElementById('lDate').textContent = t.date;
-  document.getElementById('lBudget').textContent = t.budget;
+  document.getElementById('lBudget').innerHTML = t.budget + ': <span id="budgetDisplay" style="font-weight:600;color:var(--text);">¥' + parseInt(document.getElementById('budget').value).toLocaleString() + '</span>';
   document.getElementById('budget').placeholder = t.budgetPh;
   document.getElementById('lTransit').textContent = t.transit;
   document.getElementById('transit').placeholder = t.transitPh;
