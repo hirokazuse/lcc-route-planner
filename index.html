@@ -703,6 +703,7 @@ layover_hours: hours at transit city (0 if last leg). different_airline_next: tr
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
     window._routesData = { routes: parsed.routes, depdate, parsed, showMap };
+    window.va && window.va('event', { name: 'search', data: { origin, dest: dest||'omakase', style } });
     renderRoutes(parsed.routes, depdate, parsed, showMap);
   } catch(e) {
     document.getElementById('results').innerHTML = `<div class="error">${t.errorGen}: ${e.message}</div>`;
