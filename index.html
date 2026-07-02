@@ -209,8 +209,10 @@
         <input type="date" id="depdate" />
       </div>
       <div class="form-group">
-        <label id="lBudget">予算の目安（円）</label>
-        <input type="number" id="budget" step="1000" min="0" value="80000" />
+        <label id="lBudget">予算の目安：<span id="budgetDisplay" style="font-weight:600;color:var(--text);">¥80,000</span></label>
+        <input type="range" id="budget" min="10000" max="300000" step="5000" value="80000"
+          oninput="document.getElementById('budgetDisplay').textContent='¥'+parseInt(this.value).toLocaleString();"
+          style="width:100%;accent-color:var(--text);cursor:pointer;" />
       </div>
       <div class="form-group full">
         <label id="lTransit">希望するトランジット都市（任意）</label>
